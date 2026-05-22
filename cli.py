@@ -12070,6 +12070,8 @@ class HermesCLI:
         kb = KeyBindings()
         
         def handle_enter(event):
+            import logging as _debug_log
+            _debug_log.getLogger(__name__).warning("[KEYBINDING DEBUG] handle_enter called")
             """Handle Enter key - submit input.
             
             Routes to the correct queue based on active UI state:
@@ -12247,6 +12249,9 @@ class HermesCLI:
                 event.app.current_buffer.reset(append_to_history=True)
 
         _swap_enter = CLI_CONFIG.get("display", {}).get("swap_enter_newline", False)
+        # DEBUG: verify swap mode
+        import logging as _debug_log
+        _debug_log.getLogger(__name__).warning(f"[KEYBINDING DEBUG] swap_enter_newline={_swap_enter}")
         _bind_prompt_submit_keys(kb, handle_enter, swap_enter_newline=_swap_enter)
 
         @kb.add('escape', 'enter')
@@ -12293,6 +12298,8 @@ class HermesCLI:
             @kb.add('enter')
             def handle_enter_newline(event):
                 """Enter inserts a newline when swap_enter_newline is enabled."""
+                import logging as _debug_log
+                _debug_log.getLogger(__name__).warning("[KEYBINDING DEBUG] handle_enter_newline called")
                 event.current_buffer.insert_text('\n')
 
         # VSCode/Cursor bind Ctrl+G to "Find Next" at the editor level, so
