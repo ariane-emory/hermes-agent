@@ -1069,6 +1069,10 @@ DEFAULT_CONFIG = {
             "fields": ["model", "context_pct", "cwd"],  # Order shown; drop any to hide
         },
         "copy_shortcut": "auto",  # "auto" (platform default) | "ctrl_c" | "ctrl_shift_c" | "disabled"
+        # Swap Enter and Alt+Enter keybindings in the CLI prompt.
+        # When true: Enter inserts a newline, Alt+Enter submits.
+        # When false (default): Enter submits, Alt+Enter inserts a newline.
+        "swap_enter_newline": False,
     },
 
     # Web dashboard settings

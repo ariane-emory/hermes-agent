@@ -2259,7 +2259,7 @@ def _preserve_ctrl_enter_newline() -> bool:
     return False
 
 
-def _bind_prompt_submit_keys(kb, handler) -> None:
+def _bind_prompt_submit_keys(kb, handler, swap_enter_newline: bool = False) -> None:
     """Bind terminal Enter forms to the submit handler.
 
     Enter is always submit. On POSIX we also bind c-j (LF) to submit because
@@ -2272,10 +2272,21 @@ def _bind_prompt_submit_keys(kb, handler) -> None:
     handler registered separately can fire — giving the user an
     Enter-involving newline keystroke without terminal settings changes.
     See _preserve_ctrl_enter_newline() and issue #22379.
+
+    When swap_enter_newline is True, the bindings are reversed:
+    - Enter inserts a newline
+    - Alt+Enter (escape, enter) submits
+    - Ctrl+Enter (c-j) submits
     """
-    kb.add("enter")(handler)
-    if sys.platform != "win32" and not _preserve_ctrl_enter_newline():
+    if swap_enter_newline:
+        # In swap mode: Alt+Enter submits, Ctrl+Enter submits
+        kb.add("escape", "enter")(handler)
         kb.add("c-j")(handler)
+    else:
+        # Normal mode: Enter submits
+        kb.add("enter")(handler)
+        if sys.platform != "win32" and not _preserve_ctrl_enter_newline():
+            kb.add("c-j")(handler)
 
 
 def _disable_prompt_toolkit_cpr_warning(app) -> None:
@@ -12235,23 +12246,31 @@ class HermesCLI:
                     self._pending_input.put(payload)
                 event.app.current_buffer.reset(append_to_history=True)
 
-        _bind_prompt_submit_keys(kb, handle_enter)
-        
+        _swap_enter = CLI_CONFIG.get("display", {}).get("swap_enter_newline", False)
+        _bind_prompt_submit_keys(kb, handle_enter, swap_enter_newline=_swap_enter)
+
         @kb.add('escape', 'enter')
         def handle_alt_enter(event):
-            """Alt+Enter inserts a newline for multi-line input.
+            """Alt+Enter inserts a newline for multi-line input (normal mode)
+            or submits (swap mode).
 
             Works on mac/Linux/WSL. On Windows Terminal this keystroke is
             intercepted at the terminal layer (toggles fullscreen) and never
             reaches here — Windows users get newline via Ctrl+Enter instead
             (bound below as c-j, since WT delivers Ctrl+Enter as LF).
             """
-            event.current_buffer.insert_text('\n')
+            if _swap_enter:
+                # In swap mode, Alt+Enter is bound to submit via _bind_prompt_submit_keys,
+                # so this handler should not fire. But keep as fallback.
+                handle_enter(event)
+            else:
+                event.current_buffer.insert_text('\n')
 
         if _preserve_ctrl_enter_newline():
             @kb.add('c-j')
             def handle_ctrl_enter_newline(event):
-                """Ctrl+Enter inserts a newline on Windows, WSL, SSH, and WT.
+                """Ctrl+Enter inserts a newline on Windows, WSL, SSH, and WT (normal mode)
+                or submits (swap mode).
 
                 Windows Terminal (incl. WSL/SSH sessions through it) delivers
                 Ctrl+Enter as LF (c-j), distinct from plain Enter (c-m). This
@@ -12262,6 +12281,18 @@ class HermesCLI:
                 key code — a harmless side effect since Ctrl+J has no
                 conflicting Hermes binding. See issue #22379.
                 """
+                if _swap_enter:
+                    # In swap mode, c-j is bound to submit via _bind_prompt_submit_keys,
+                    # so this handler should not fire. But keep as fallback.
+                    handle_enter(event)
+                else:
+                    event.current_buffer.insert_text('\n')
+
+        # When swap_enter_newline is enabled, bind plain Enter to insert newline
+        if _swap_enter:
+            @kb.add('enter')
+            def handle_enter_newline(event):
+                """Enter inserts a newline when swap_enter_newline is enabled."""
                 event.current_buffer.insert_text('\n')
 
         # VSCode/Cursor bind Ctrl+G to "Find Next" at the editor level, so
